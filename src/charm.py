@@ -52,6 +52,8 @@ class CinderCSIOperatorCharm(CharmBase):
             self.lk_helpers.apply_manifest(manifest)
         self.lk_helpers.apply_resource(
             StorageClass,
+            kind="StorageClass",
+            apiVersion="storage.k8s.io/v1",
             name="cinder",
             provisioner="cinder.csi.openstack.org",
             annotations={"juju.io/workload-storage": "true"},
