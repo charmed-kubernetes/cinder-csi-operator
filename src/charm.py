@@ -66,7 +66,7 @@ class CinderCSIOperatorCharm(CharmBase):
     def _cleanup(self, event):
         self.unit.status = MaintenanceStatus("Cleaning up Cinder CSI")
         for manifest in self.manifests.glob("**/*.yaml"):
-            self.helpers.delete_manifest(manifest, ignore_unauthorized=True)
+            self.lk_helpers.delete_manifest(manifest, ignore_unauthorized=True)
         self.lk_helpers.delete_resource(StorageClass, name="cinder")
         self.unit.status = WaitingStatus("Shutting down")
 
