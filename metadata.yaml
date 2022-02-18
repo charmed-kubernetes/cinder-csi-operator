@@ -13,11 +13,10 @@ requires:
 
 containers:
   base:
-    resource: base-image
+    resource: operator-base
 
 resources:
-  base-image:
+  operator-base:
     type: oci-image
-    description: OCI image for the operator code to run on (ubuntu:focal)
-    # Included for simplicity in integration tests
+    description: Base image for the operator to run with (ubuntu:focal)
     upstream-source: ubuntu:focal
