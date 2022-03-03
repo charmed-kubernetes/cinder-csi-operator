@@ -1,104 +1,77 @@
 #!/usr/bin/env python3
-# Copyright 2021 Canonical Ltd.
+# Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-#
-# Learn more at: https://juju.is/docs/sdk
-
-"""Charm the service.
-
-Refer to the following post for a quick-start guide that will help you
-develop a new k8s charm using the Operator Framework:
-
-    https://discourse.charmhub.io/t/4208
-"""
+"""Deploy and manage the Cinder CSI plugin for K8s on OpenStack."""
 
 import logging
+from pathlib import Path
 
+from charms.openstack_cloud_controller_operator.v0.cloud_config import (
+    CloudConfigRequires,
+)
+from charms.openstack_cloud_controller_operator.v0.lightkube_helpers import (
+    LightKubeHelpers,
+)
+from lightkube.resources.storage_v1 import StorageClass
 from ops.charm import CharmBase
-from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 
 logger = logging.getLogger(__name__)
 
 
-class OperatorTemplateCharm(CharmBase):
-    """Charm the service."""
+class CinderCSIOperatorCharm(CharmBase):
+    """Deploy and manage the Cinder CSI plugin for K8s on OpenStack."""
 
-    _stored = StoredState()
+    manifests = Path("upstream/manifests")
+    version = Path("upstream/version").read_text()
 
     def __init__(self, *args):
         super().__init__(*args)
-        self.framework.observe(self.on.httpbin_pebble_ready, self._on_httpbin_pebble_ready)
-        self.framework.observe(self.on.config_changed, self._on_config_changed)
-        self.framework.observe(self.on.fortune_action, self._on_fortune_action)
-        self._stored.set_default(things=[])
+        self.cloud_config = CloudConfigRequires(self)
+        self.lk_helpers = LightKubeHelpers(self)
+        self.framework.observe(self.on.install, self._install_or_upgrade)
+        self.framework.observe(self.on.upgrade_charm, self._install_or_upgrade)
+        self.framework.observe(self.on.cloud_config_relation_created, self._install_or_upgrade)
+        self.framework.observe(self.cloud_config.on.ready, self._install_or_upgrade)
+        self.framework.observe(self.on.leader_elected, self._set_version)
+        self.framework.observe(self.on.stop, self._cleanup)
 
-    def _on_httpbin_pebble_ready(self, event):
-        """Define and start a workload using the Pebble API.
-
-        TEMPLATE-TODO: change this example to suit your needs.
-        You'll need to specify the right entrypoint and environment
-        configuration for your specific workload. Tip: you can see the
-        standard entrypoint of an existing container using docker inspect
-
-        Learn more about Pebble layers at https://github.com/canonical/pebble
-        """
-        # Get a reference the container attribute on the PebbleReadyEvent
-        container = event.workload
-        # Define an initial Pebble layer configuration
-        pebble_layer = {
-            "summary": "httpbin layer",
-            "description": "pebble config layer for httpbin",
-            "services": {
-                "httpbin": {
-                    "override": "replace",
-                    "summary": "httpbin",
-                    "command": "gunicorn -b 0.0.0.0:80 httpbin:app -k gevent",
-                    "startup": "enabled",
-                    "environment": {"thing": self.model.config["thing"]},
-                }
-            },
-        }
-        # Add initial Pebble config layer using the Pebble API
-        container.add_layer("httpbin", pebble_layer, combine=True)
-        # Autostart any services that were defined with startup: enabled
-        container.autostart()
-        # Learn more about statuses in the SDK docs:
-        # https://juju.is/docs/sdk/constructs#heading--statuses
+    def _install_or_upgrade(self, event):
+        if not self.cloud_config.relations:
+            self.unit.status = BlockedStatus("Missing cloud-config relation")
+            return
+        if not self.cloud_config.is_ready():
+            self.unit.status = WaitingStatus("Waiting for cloud-config")
+            return
+        self.unit.status = MaintenanceStatus("Deploying Cinder CSI")
+        for manifest in self.manifests.glob("**/*.yaml"):
+            if "secret" in manifest.name:
+                # The upstream secret contains dummy data, so skip it.
+                continue
+            self.lk_helpers.apply_manifest(manifest)
+        self.lk_helpers.apply_resource(
+            StorageClass,
+            kind="StorageClass",
+            apiVersion="storage.k8s.io/v1",
+            name="cinder",
+            provisioner="cinder.csi.openstack.org",
+            annotations={"juju.io/workload-storage": "true"},
+        )
         self.unit.status = ActiveStatus()
+        self._set_version()
 
-    def _on_config_changed(self, _):
-        """Just an example to show how to deal with changed configuration.
+    def _set_version(self, event=None):
+        if self.unit.is_leader():
+            self.unit.set_workload_version(self.version)
 
-        TEMPLATE-TODO: change this example to suit your needs.
-        If you don't need to handle config, you can remove this method,
-        the hook created in __init__.py for it, the corresponding test,
-        and the config.py file.
-
-        Learn more about config at https://juju.is/docs/sdk/config
-        """
-        current = self.config["thing"]
-        if current not in self._stored.things:
-            logger.debug("found a new thing: %r", current)
-            self._stored.things.append(current)
-
-    def _on_fortune_action(self, event):
-        """Just an example to show how to receive actions.
-
-        TEMPLATE-TODO: change this example to suit your needs.
-        If you don't need to handle actions, you can remove this method,
-        the hook created in __init__.py for it, the corresponding test,
-        and the actions.py file.
-
-        Learn more about actions at https://juju.is/docs/sdk/actions
-        """
-        fail = event.params["fail"]
-        if fail:
-            event.fail(fail)
-        else:
-            event.set_results({"fortune": "A bug in the code is worth two in the documentation."})
+    def _cleanup(self, event):
+        self.unit.status = MaintenanceStatus("Cleaning up Cinder CSI")
+        for manifest in self.manifests.glob("**/*.yaml"):
+            self.lk_helpers.delete_manifest(manifest, ignore_unauthorized=True)
+        self.lk_helpers.delete_resource(StorageClass, name="cinder")
+        self.unit.status = WaitingStatus("Shutting down")
 
 
 if __name__ == "__main__":
-    main(OperatorTemplateCharm)
+    main(CinderCSIOperatorCharm)

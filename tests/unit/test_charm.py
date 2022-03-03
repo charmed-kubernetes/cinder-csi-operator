@@ -1,67 +1,45 @@
-# Copyright 2021 Canonical Ltd.
+# Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 #
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
-import unittest
 from unittest.mock import Mock
 
-from ops.model import ActiveStatus
+import pytest
+from charms.openstack_cloud_controller_operator.v0.cloud_config import (
+    MockCloudConfigProvides,
+)
+from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
 
-from charm import OperatorTemplateCharm
+from charm import CinderCSIOperatorCharm
 
 
-class TestCharm(unittest.TestCase):
-    def setUp(self):
-        self.harness = Harness(OperatorTemplateCharm)
-        self.addCleanup(self.harness.cleanup)
-        self.harness.begin()
+@pytest.fixture
+def harness():
+    harness = Harness(CinderCSIOperatorCharm)
+    try:
+        yield harness
+    finally:
+        harness.cleanup()
 
-    def test_config_changed(self):
-        self.assertEqual(list(self.harness.charm._stored.things), [])
-        self.harness.update_config({"thing": "foo"})
-        self.assertEqual(list(self.harness.charm._stored.things), ["foo"])
 
-    def test_action(self):
-        # the harness doesn't (yet!) help much with actions themselves
-        action_event = Mock(params={"fail": ""})
-        self.harness.charm._on_fortune_action(action_event)
+@pytest.fixture
+def lk_client(monkeypatch):
+    monkeypatch.setattr(
+        "charms.openstack_cloud_controller_operator.v0.lightkube_helpers.Client",
+        client := Mock(name="lightkube.Client"),
+    )
+    return client
 
-        self.assertTrue(action_event.set_results.called)
 
-    def test_action_fail(self):
-        action_event = Mock(params={"fail": "fail this"})
-        self.harness.charm._on_fortune_action(action_event)
+def test_cinder_csi(harness, lk_client):
+    harness.set_leader(True)
+    harness.begin_with_initial_hooks()
+    assert isinstance(harness.charm.unit.status, BlockedStatus)
 
-        self.assertEqual(action_event.fail.call_args, [("fail this",)])
-
-    def test_httpbin_pebble_ready(self):
-        # Check the initial Pebble plan is empty
-        initial_plan = self.harness.get_container_pebble_plan("httpbin")
-        self.assertEqual(initial_plan.to_yaml(), "{}\n")
-        # Expected plan after Pebble ready with default config
-        expected_plan = {
-            "services": {
-                "httpbin": {
-                    "override": "replace",
-                    "summary": "httpbin",
-                    "command": "gunicorn -b 0.0.0.0:80 httpbin:app -k gevent",
-                    "startup": "enabled",
-                    "environment": {"thing": "🎁"},
-                }
-            },
-        }
-        # Get the httpbin container from the model
-        container = self.harness.model.unit.get_container("httpbin")
-        # Emit the PebbleReadyEvent carrying the httpbin container
-        self.harness.charm.on.httpbin_pebble_ready.emit(container)
-        # Get the plan now we've run PebbleReady
-        updated_plan = self.harness.get_container_pebble_plan("httpbin").to_dict()
-        # Check we've got the plan we expected
-        self.assertEqual(expected_plan, updated_plan)
-        # Check the service was started
-        service = self.harness.model.unit.get_container("httpbin").get_service("httpbin")
-        self.assertTrue(service.is_running())
-        # Ensure we set an ActiveStatus with no message
-        self.assertEqual(self.harness.model.unit.status, ActiveStatus())
+    cc_provides = MockCloudConfigProvides(harness)
+    cc_provides.relate()
+    assert isinstance(harness.charm.unit.status, WaitingStatus)
+    cc_provides.send_hash("hash")
+    assert isinstance(harness.charm.unit.status, ActiveStatus)
