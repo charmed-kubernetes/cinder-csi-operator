@@ -11,6 +11,7 @@ show_missing = true
 [tool.pytest.ini_options]
 minversion = "6.0"
 log_cli_level = "INFO"
+asyncio_mode = "auto"
 
 # Formatting tools configuration
 [tool.black]
@@ -37,5 +38,7 @@ docstring-convention = "google"
 copyright-check = "True"
 copyright-author = "Canonical Ltd."
 copyright-regexp = "Copyright\\s\\d{4}([-,]\\d{4})*\\s+%(author)s"
+classmethod-decorators = "classmethod,validator"
+
 [tool.mypy]
 mypy-path = "src:lib"
