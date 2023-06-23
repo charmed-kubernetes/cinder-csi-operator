@@ -3,6 +3,7 @@ applications:
   kubernetes-control-plane:
     options:
       allow-privileged: "true"
+    constraints: allocate-public-ip=true
   openstack-integrator:
     charm: openstack-integrator
     channel: edge

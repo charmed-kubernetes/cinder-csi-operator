@@ -7,6 +7,11 @@ summary: Deploys and manages the Cinder CSI plugin for K8s on OpenStack.
 description: Deploys and manages the Cinder CSI plugin for K8s on OpenStack.
 docs: https://discourse.charmhub.io/t/cinder-csi-operator-docs-index/????
 subordinate: true
+tags:
+  - kubernetes
+  - csi
+  - cinder
+  - openstack
 
 requires:
   openstack:

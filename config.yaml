@@ -1,7 +1,6 @@
 options:
   image-registry:
     type: string
-    default: k8s.gcr.io
     description: |
       Source registry of Cinder CSI storage images.
 
