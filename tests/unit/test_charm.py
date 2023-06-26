@@ -154,6 +154,8 @@ def test_waits_for_kube_control(mock_create_kubeconfig, harness, caplog):
     assert storage_messages == {
         "Encode secret data for storage.",
         "Creating storage class csi-cinder-default",
+        "Setting secret for DaemonSet/csi-cinder-nodeplugin",
+        "Setting secret for Deployment/csi-cinder-controllerplugin",
     }
 
     caplog.clear()

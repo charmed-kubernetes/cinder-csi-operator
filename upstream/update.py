@@ -37,7 +37,6 @@ SOURCES = dict(
             "cinder-csi-nodeplugin-rbac.yaml",
             "cinder-csi-nodeplugin.yaml",
             "csi-cinder-driver.yaml",
-            "csi-secret-cinderplugin.yaml",
         ],
         path="manifests/cinder-csi-plugin",
         version_parser=VersionInfo.parse,

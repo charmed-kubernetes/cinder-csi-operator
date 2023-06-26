@@ -3,7 +3,6 @@ applications:
   kubernetes-control-plane:
     options:
       allow-privileged: "true"
-    constraints: allocate-public-ip=true
   openstack-integrator:
     charm: openstack-integrator
     channel: edge
@@ -18,7 +17,8 @@ relations:
   - kubernetes-control-plane:kube-control
 - - cinder-csi:openstack
   - openstack-integrator:clients
-
-# continue to use this until migrating the control-plane away from the in-tree one
-- - openstack-integrator:clients
-  - kubernetes-control-plane:openstack
+machines:
+  '0':
+    constraints: cores=2 mem=8G root-disk=16G allocate-public-ip=true
+  '1':
+    constraints: cores=2 mem=8G root-disk=16G

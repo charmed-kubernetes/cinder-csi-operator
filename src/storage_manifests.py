@@ -8,11 +8,11 @@ from hashlib import md5
 from typing import Dict, Optional
 
 from lightkube.codecs import AnyResource, from_dict
-from ops.manifests import Addition, ConfigRegistry, ManifestLabel, Manifests
+from ops.manifests import Addition, ConfigRegistry, ManifestLabel, Manifests, Patch
 
 log = logging.getLogger(__file__)
-NAMESPACE = "gce-pd-csi-driver"
-SECRET_NAME = "cloud-sa"
+NAMESPACE = "kube-system"
+SECRET_NAME = "csi-cinder-cloud-config"
 STORAGE_CLASS_NAME = "csi-cinder-{type}"
 
 
@@ -28,12 +28,10 @@ class CreateSecret(Addition):
 
     def __call__(self) -> Optional[AnyResource]:
         """Craft the secrets object for the deployment."""
-        secret_config = {
-            new_k: self.manifests.config.get(k) for k, new_k in self.CONFIG_TO_SECRET.items()
-        }
-        if any(s is None for s in secret_config.values()):
-            log.error("secret data item is None")
-            return None
+        secret_config = {}
+        for k, new_k in self.CONFIG_TO_SECRET.items():
+            if value := self.manifests.config.get(k):
+                secret_config[new_k] = value
 
         log.info("Encode secret data for storage.")
         return from_dict(
@@ -41,7 +39,7 @@ class CreateSecret(Addition):
                 apiVersion="v1",
                 kind="Secret",
                 type="Opaque",
-                metadata=dict(name="cloud-config", namespace="kube-system"),
+                metadata=dict(name=SECRET_NAME, namespace=NAMESPACE),
                 data=secret_config,
             )
         )
@@ -74,6 +72,25 @@ class CreateStorageClass(Addition):
         return sc
 
 
+class UpdateSecrets(Patch):
+    """Update the secret name in Deployments and DaemonSets."""
+
+    def __call__(self, obj):
+        """Update the DaemonSet object in the deployment."""
+        if not any(
+            [
+                (obj.kind == "DaemonSet" and obj.metadata.name == "csi-cinder-nodeplugin"),
+                (obj.kind == "Deployment" and obj.metadata.name == "csi-cinder-controllerplugin"),
+            ]
+        ):
+            return
+
+        for volume in obj.spec.template.spec.volumes:
+            if volume.secret:
+                volume.secret.secretName = SECRET_NAME
+                log.info(f"Setting secret for {obj.kind}/{obj.metadata.name}")
+
+
 class StorageManifests(Manifests):
     """Deployment Specific details for the cinder-csi-driver."""
 
@@ -87,6 +104,7 @@ class StorageManifests(Manifests):
                 ManifestLabel(self),
                 ConfigRegistry(self),
                 CreateStorageClass(self, "default"),  # creates csi-cinder-default
+                UpdateSecrets(self),  # update secrets
             ],
         )
         self.integrator = integrator
@@ -120,9 +138,7 @@ class StorageManifests(Manifests):
 
     def evaluate(self) -> Optional[str]:
         """Determine if manifest_config can be applied to manifests."""
-        props = CreateSecret.CONFIG_TO_SECRET.keys()
-        for prop in props:
-            value = self.config.get(prop)
-            if not value:
+        for prop in ["cloud-conf"]:
+            if not self.config.get(prop):
                 return f"Storage manifests waiting for definition of {prop}"
         return None
