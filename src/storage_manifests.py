@@ -31,7 +31,7 @@ class CreateSecret(Addition):
         secret_config = {}
         for k, new_k in self.CONFIG_TO_SECRET.items():
             if value := self.manifests.config.get(k):
-                secret_config[new_k] = value
+                secret_config[new_k] = value.decode()
 
         log.info("Encode secret data for storage.")
         return from_dict(
@@ -76,7 +76,7 @@ class UpdateSecrets(Patch):
     """Update the secret name in Deployments and DaemonSets."""
 
     def __call__(self, obj):
-        """Update the DaemonSet object in the deployment."""
+        """Update the secret volume spec in daemonsets and deployments."""
         if not any(
             [
                 (obj.kind == "DaemonSet" and obj.metadata.name == "csi-cinder-nodeplugin"),
@@ -120,8 +120,8 @@ class StorageManifests(Manifests):
             config["image-registry"] = self.kube_control.get_registry_location()
 
         if self.integrator.is_ready:
-            config["cloud-conf"] = self.integrator.cloud_conf.decode()
-            config["endpoint-ca-cert"] = self.integrator.endpoint_tls_ca.decode()
+            config["cloud-conf"] = self.integrator.cloud_conf_b64
+            config["endpoint-ca-cert"] = self.integrator.endpoint_tls_ca
 
         config.update(**self.charm_config.available_data)
 

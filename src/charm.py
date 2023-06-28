@@ -9,13 +9,14 @@ from pathlib import Path
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.interface_kube_control import KubeControlRequirer
+from ops.interface_openstack_integration import OpenstackIntegrationRequirer
+
 from ops.main import main
 from ops.manifests import Collector, ManifestClientError
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 
 from config import CharmConfig
 from requires_certificates import CertificatesRequires
-from requires_integrator import OpenstackRequires
 from storage_manifests import StorageManifests
 
 log = logging.getLogger(__name__)
@@ -34,7 +35,7 @@ class CinderCSICharm(CharmBase):
         # Relation Validator and datastore
         self.kube_control = KubeControlRequirer(self)
         self.certificates = CertificatesRequires(self)
-        self.integrator = OpenstackRequires(self)
+        self.integrator = OpenstackIntegrationRequirer(self)
         # Config Validator and datastore
         self.charm_config = CharmConfig(self)
 

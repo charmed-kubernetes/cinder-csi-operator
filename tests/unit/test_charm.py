@@ -32,10 +32,10 @@ def mock_ca_cert(tmpdir):
 
 @pytest.fixture()
 def integrator():
-    with mock.patch("charm.OpenstackRequires") as mocked:
+    with mock.patch("charm.OpenstackIntegrationRequirer") as mocked:
         integrator = mocked.return_value
         integrator.evaluate_relation.return_value = None
-        integrator.cloud_conf = b"abc"
+        integrator.cloud_conf_b64 = b"abc"
         integrator.endpoint_tls_ca = b"def"
         yield integrator
 

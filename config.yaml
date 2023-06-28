@@ -16,7 +16,7 @@ options:
   storage-release:
     type: string
     description: |
-      Specify the version of storage-provider as defined by the `release`
+      Specify the version of storage-release as defined by the `release`
       tags of https://github.com/kubernetes/cloud-provider-openstack
 
       example)
