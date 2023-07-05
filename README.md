@@ -1,26 +1,40 @@
-# cinder-csi-operator
+# cinder-csi
 
 ## Description
 
-This Charmed Operator deploys and manages the Cinder CSI plugin component for
-K8s on OpenStack.
+This subordinate charm manages the cinder-csi-driver components a Kubernetes cloud deployed on Openstack.
 
 ## Usage
 
-After deploying, this charm needs to be related to the OpenStack Cloud Controller
-Operator to be notified when the `cloud-config` secret is available.
+The charm requires openstack credentials and connection information, which
+can be provided via the `openstack-integration` relation to the [Openstack Integrator charm](https://charmhub.io/openstack-integrator).
 
+## Deployment
+
+### The full process
+
+```bash
+juju deploy charmed-kubernetes
+juju config kubernetes-control-plane allow-privileged=true
+juju deploy openstack-integrator --trust
+juju deploy cinder-csi
+
+juju relate cinder-csi:certificates     easyrsa:client
+juju relate cinder-csi:kube-control     kubernetes-control-plane:kube-control
+juju relate cinder-csi:openstack  openstack-integrator:clients
+
+##  wait for the kubernetes-control-plane to be active/idle
 ```
-juju relation cinder-csi-operator openstack-cloud-controller-operator
-```
 
-## OCI Images
+### Details
 
-The base image for this operator can be provided with `--resource operator-base=ubuntu:focal`.
+* Requires a `charmed-kubernetes` deployment on a openstack cloud launched by juju
+* Deploy the `openstack-integrator` charm into the model using `--trust` so juju provides openstack credentials
+* Deploy the `cinder-csi` charm in the model relating to the integrator and to charmed-kubernetes components
+* Once the model is active/idle, the storage charm will have successfully deployed the cinder-csi in the `kube-system` namespace
 
 ## Contributing
 
-Please see the [Juju SDK docs](https://juju.is/docs/sdk) for guidelines on
-enhancements to this charm following best practice guidelines, and
-[CONTRIBUTING.md](https://github.com/canonical/cinder-csi-operator/blob/main/CONTRIBUTING.md)
-for developer guidance.
+Please see the [Juju SDK docs](https://juju.is/docs/sdk) for guidelines
+on enhancements to this charm following best practice guidelines, and
+[CONTRIBUTING.md](https://github.com/canonical/cinder-csi/blob/main/CONTRIBUTING.md) for developer guidance.
