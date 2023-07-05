@@ -5,7 +5,7 @@ name: cinder-csi
 display-name: Cinder CSI Operator
 summary: Deploys and manages the Cinder CSI plugin for K8s on OpenStack.
 description: Deploys and manages the Cinder CSI plugin for K8s on OpenStack.
-docs: https://discourse.charmhub.io/t/cinder-csi-docs-index/????
+docs: https://discourse.charmhub.io/t/cinder-csi-charm-docs-index/11081
 subordinate: true
 tags:
   - kubernetes
