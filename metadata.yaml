@@ -1,22 +1,25 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-name: cinder-csi-operator
+name: cinder-csi
 display-name: Cinder CSI Operator
-description: Deploys and manages the Cinder CSI plugin for K8s on OpenStack.
 summary: Deploys and manages the Cinder CSI plugin for K8s on OpenStack.
+description: Deploys and manages the Cinder CSI plugin for K8s on OpenStack.
+docs: https://discourse.charmhub.io/t/cinder-csi-charm-docs-index/11081
+subordinate: true
+tags:
+  - kubernetes
+  - csi
+  - cinder
+  - openstack
 
 requires:
-  cloud-config:
-    interface: cloud_config
+  openstack:
+    interface: openstack-integration
+    scope: container
     limit: 1
-
-containers:
-  base:
-    resource: operator-base
-
-resources:
-  operator-base:
-    type: oci-image
-    description: Base image for the operator to run with (ubuntu:focal)
-    upstream-source: ubuntu:focal
+  kube-control:
+    interface: kube-control
+    limit: 1
+  certificates:
+    interface: tls-certificates

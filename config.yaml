@@ -1,0 +1,39 @@
+options:
+  image-registry:
+    type: string
+    description: |
+      Source registry of Cinder CSI storage images.
+
+      By setting to a value, each image listed in the releases manifest
+      has its image-registry replaced.
+
+      If unset, the manifests will use the image registry from the kube-control relation
+
+      example)
+        juju config cinder-csi image-registry='rocks.canonical.com:443/cdk'
+        juju config cinder-csi --reset image-registry
+
+  storage-release:
+    type: string
+    description: |
+      Specify the version of storage-release as defined by the `release`
+      tags of https://github.com/kubernetes/cloud-provider-openstack
+
+      example)
+        juju config cinder-csi storage-release='v1.7.3'
+      
+      A list of supported versions is available through the action:
+        juju run-action cinder-csi/leader list-releases --wait
+      
+      To reset by to the latest supported by the charm use:
+        juju config cinder-csi --reset storage-release
+      
+      The current release deployed is available by viewing
+        juju status cinder-csi
+
+  availability-zone:
+    type: string
+    default: ""
+    description: |
+      Availability zone to use with Cinder CSI. This is passed through to the
+      parameters.availability field of the csi-cinder-default StorageClass.
