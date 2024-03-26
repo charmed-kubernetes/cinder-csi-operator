@@ -63,12 +63,12 @@ class CreateStorageClass(Addition):
                 metadata=dict(name=storage_name),
                 provisioner="cinder.csi.openstack.org",
                 reclaimPolicy="Delete",
-                volumeBindingMode="WaitForFirstConsumer",
+                volumeBindingMode="WaitForFirstConsumer"
             )
         )
-
+    
         if az := self.manifests.config.get("availability-zone"):
-            sc.parameters.availability = az
+            sc.parameters = dict(availability=az)
         return sc
 
 
@@ -105,6 +105,7 @@ class StorageManifests(Manifests):
                 ConfigRegistry(self),
                 CreateStorageClass(self, "default"),  # creates csi-cinder-default
                 UpdateSecrets(self),  # update secrets
+                UpdateControllerPlugin,
             ],
         )
         self.integrator = integrator
@@ -142,3 +143,24 @@ class StorageManifests(Manifests):
             if not self.config.get(prop):
                 return f"Storage manifests waiting for definition of {prop}"
         return None
+
+class UpdateControllerPlugin(Patch):
+    """Update the controller args in Deployments."""
+
+    def __call__(self, obj):
+        """Update the controller args in Deployments."""
+        if not any(
+            [
+                (obj.kind == "DaemonSet" and obj.metadata.name == "csi-cinder-nodeplugin"),
+                (obj.kind == "Deployment" and obj.metadata.name == "csi-cinder-controllerplugin"),
+            ]
+        ):
+            return
+
+        for container in obj.spec.template.spec.containers:
+            if container.name == "csi-provisioner":
+                for i, val in enumerate(container.args):
+                    if "feature-gates" in val.lower():
+                        container.args[i] = f"feature-gates=Topology={self.manifests.config.get('topology')}"
+                log.info(f"Disabling cinder topology awareness")
+

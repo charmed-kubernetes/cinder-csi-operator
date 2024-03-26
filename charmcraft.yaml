@@ -12,13 +12,11 @@ bases:
       - name: ubuntu
         channel: "20.04"
         architectures:
-          - amd64
-          - arm64
+        - "amd64"
       - name: ubuntu
         channel: "22.04"
-        architectures:
-          - amd64
-          - arm64
+        architectures: 
+        - "amd64"
 parts:
   charm:
     build-packages:
