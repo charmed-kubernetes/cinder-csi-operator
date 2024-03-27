@@ -150,11 +150,7 @@ class UpdateControllerPlugin(Patch):
 
     def __call__(self, obj):
         """Update the controller args in Deployments."""
-        if not any(
-            [
-                (obj.kind == "Deployment" and obj.metadata.name == "csi-cinder-controllerplugin"),
-            ]
-        ):
+        if not (obj.kind == "Deployment" and obj.metadata.name == "csi-cinder-controllerplugin"):
             return
 
         for container in obj.spec.template.spec.containers:
