@@ -66,6 +66,7 @@ class CreateStorageClass(Addition):
                 volumeBindingMode="WaitForFirstConsumer",
             )
         )
+    
         if az := self.manifests.config.get("availability-zone"):
             sc.parameters = dict(availability=az)
         return sc
@@ -76,7 +77,12 @@ class UpdateSecrets(Patch):
 
     def __call__(self, obj):
         """Update the secret volume spec in daemonsets and deployments."""
-        if not (obj.kind == "Deployment" and obj.metadata.name == "csi-cinder-controllerplugin"):
+        if not any(
+            [
+                (obj.kind == "DaemonSet" and obj.metadata.name == "csi-cinder-nodeplugin"),
+                (obj.kind == "Deployment" and obj.metadata.name == "csi-cinder-controllerplugin"),
+            ]
+        ):
             return
 
         for volume in obj.spec.template.spec.volumes:
