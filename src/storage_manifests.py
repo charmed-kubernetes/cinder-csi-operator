@@ -63,7 +63,7 @@ class CreateStorageClass(Addition):
                 metadata=dict(name=storage_name),
                 provisioner="cinder.csi.openstack.org",
                 reclaimPolicy="Delete",
-                volumeBindingMode="WaitForFirstConsumer"
+                volumeBindingMode="WaitForFirstConsumer",
             )
         )
     
