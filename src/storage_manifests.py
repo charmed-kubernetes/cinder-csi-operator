@@ -138,6 +138,7 @@ class StorageManifests(Manifests):
                 return f"Storage manifests waiting for definition of {prop}"
         return None
 
+
 class UpdateControllerPlugin(Patch):
     """Update the controller args in Deployments."""
 
@@ -156,4 +157,4 @@ class UpdateControllerPlugin(Patch):
                     if "feature-gates" in val.lower():
                         topology = str(self.manifests.config.get("topology")).lower()
                         container.args[i] = f"feature-gates=Topology={topology}"
-                        log.info(f"Configuring cinder topology awareness=%s", topology)
+                        log.info("Configuring cinder topology awareness=%s", topology)
