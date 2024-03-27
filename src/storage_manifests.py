@@ -66,7 +66,6 @@ class CreateStorageClass(Addition):
                 volumeBindingMode="WaitForFirstConsumer",
             )
         )
-    
         if az := self.manifests.config.get("availability-zone"):
             sc.parameters = dict(availability=az)
         return sc
