@@ -105,7 +105,7 @@ class StorageManifests(Manifests):
                 ConfigRegistry(self),
                 CreateStorageClass(self, "default"),  # creates csi-cinder-default
                 UpdateSecrets(self),  # update secrets
-                UpdateControllerPlugin,
+                UpdateControllerPlugin(self),
             ],
         )
         self.integrator = integrator
@@ -151,7 +151,6 @@ class UpdateControllerPlugin(Patch):
         """Update the controller args in Deployments."""
         if not any(
             [
-                (obj.kind == "DaemonSet" and obj.metadata.name == "csi-cinder-nodeplugin"),
                 (obj.kind == "Deployment" and obj.metadata.name == "csi-cinder-controllerplugin"),
             ]
         ):
@@ -161,6 +160,6 @@ class UpdateControllerPlugin(Patch):
             if container.name == "csi-provisioner":
                 for i, val in enumerate(container.args):
                     if "feature-gates" in val.lower():
-                        container.args[i] = f"feature-gates=Topology={self.manifests.config.get('topology')}"
-                log.info(f"Disabling cinder topology awareness")
-
+                        topology = str(self.manifests.config.get("topology")).lower()
+                        container.args[i] = f"feature-gates=Topology={topology}"
+                        log.info(f"Configuring cinder topology awareness=%s", topology)
