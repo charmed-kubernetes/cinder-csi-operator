@@ -56,13 +56,15 @@ class CreateStorageClass(Addition):
         """Craft the storage class object."""
         storage_name = STORAGE_CLASS_NAME.format(type=self.type)
         log.info(f"Creating storage class {storage_name}")
+        reclaim_policy: str = self.manifests.config.get("reclaim-policy") or "Delete"
+
         sc = from_dict(
             dict(
                 apiVersion="storage.k8s.io/v1",
                 kind="StorageClass",
                 metadata=dict(name=storage_name),
                 provisioner="cinder.csi.openstack.org",
-                reclaimPolicy="Delete",
+                reclaimPolicy=reclaim_policy.title(),
                 volumeBindingMode="WaitForFirstConsumer",
             )
         )
