@@ -6,12 +6,13 @@ import datetime
 import logging
 import pickle
 from hashlib import md5
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, cast
 
 import charms.proxylib
 from lightkube import Client
 from lightkube.codecs import AnyResource, from_dict
 from lightkube.models.core_v1 import Event, Pod
+from ops.interface_kube_control import KubeControlRequirer
 from ops.manifests import (
     Addition,
     ConfigRegistry,
@@ -113,8 +114,19 @@ class UpdateCSIDriver(Patch):
             return
 
         log.info(f"Setting secret for {obj.kind}/{obj.metadata.name}")
+        self._update_node_selector(obj)
         self._update_secrets(obj.spec.template.spec.volumes)
         self._update_pod_spec(obj.spec.template.spec.containers)
+
+    def _update_node_selector(self, obj):
+        """Update the node selector for the controllerplugin deployment."""
+        if obj.kind != "Deployment" or obj.metadata.name != "csi-cinder-controllerplugin":
+            return
+
+        node_selector = cast(dict, self.manifests.config["control-node-selector"])
+        node_selector_text = " ".join('{0}: "{1}"'.format(*t) for t in node_selector.items())
+        log.info(f"Applying Control Node Selector as {node_selector_text}")
+        obj.spec.template.spec.nodeSelector = node_selector
 
     def _update_secrets(self, volumes):
         """Update the volumes in the deployment or daemonset."""
@@ -143,7 +155,7 @@ class UpdateCSIDriver(Patch):
 class StorageManifests(Manifests):
     """Deployment Specific details for the cinder-csi-driver."""
 
-    def __init__(self, charm, charm_config, kube_control, integrator):
+    def __init__(self, charm, charm_config, kube_control: KubeControlRequirer, integrator):
         super().__init__(
             "cinder-csi-driver",
             charm.model,
@@ -163,10 +175,23 @@ class StorageManifests(Manifests):
     @property
     def config(self) -> Dict:
         """Returns current config available from charm config and joined relations."""
+        if labels := self.kube_control.get_controller_labels():
+            stable_sort = sorted(labels, key=lambda val: val.key)
+            controller_labels = {label.key: label.value for label in stable_sort}
+        else:
+            # the controller labels are sourced from juju config on either
+            # the k8s or kubernetes-control-plane charm.
+            # These could represent empty labels (as in the default with k8s)
+            # and can also just be empty if the user judges to remove them
+            # in order to make sure the cinder controllers land on controller
+            # nodes we can just fallback to this well-known label
+            log.warning("No controller labels found, using fallback")
+            controller_labels = {"juju-application": self.kube_control.relation.app.name}
         config = {
             "image-registry": self.kube_control.get_registry_location(),
             "cluster-name": self.kube_control.get_cluster_tag(),
             "cloud-conf": (val := self.integrator.cloud_conf_b64) and val.decode(),
+            "control-node-selector": controller_labels,
             "endpoint-ca-cert": (val := self.integrator.endpoint_tls_ca) and val.decode(),
             **self.charm_config.available_data,
         }
